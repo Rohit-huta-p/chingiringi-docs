@@ -21,7 +21,7 @@ ChingiRingi development is organized into 4 phases, progressing from core functi
 
 | Feature | Branch | Status |
 |---------|--------|--------|
-| Deals API (CRUD, search, categories, banners) | `feature/deals-api` | Not started |
+| Deals API (CRUD, search, categories, banners) | `feature/deals-api` | Done |
 | Wallet API (balance, transaction history) | `feature/wallet-api` | Not started |
 | Profile API (update profile, avatar upload) | `feature/profile-api` | Not started |
 | Address API (CRUD addresses) | `feature/address-api` | Not started |

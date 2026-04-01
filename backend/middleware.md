@@ -26,6 +26,38 @@ Protects routes that require authentication. Used on `/auth/logout` and `/auth/m
 
 ---
 
+## Admin Middleware (`admin`)
+
+**File:** `middleware/adminMiddleware.js`
+
+Restricts access to admin-only routes. Must be used after the `protect` middleware so that `req.user` is available.
+
+### Behavior
+
+1. Checks that `req.user.role` equals `'admin'`.
+2. If the user is an admin, calls `next()` to proceed.
+3. If the user is not an admin, responds with a `403` error.
+
+### Error Cases
+
+| Condition | Status | Message |
+|---|---|---|
+| `req.user.role` is not `'admin'` | 403 | "Not authorized as admin" |
+
+### Usage
+
+Applied as the second middleware (after `protect`) on routes that require admin privileges:
+
+```js
+router.post('/', protect, admin, createDeal);
+router.put('/:id', protect, admin, updateDeal);
+router.delete('/:id', protect, admin, deleteDeal);
+```
+
+Used by the Deals and Categories modules for create, update, and delete operations.
+
+---
+
 ## Error Handler (`errorHandler`)
 
 **File:** `middleware/errorMiddleware.js`

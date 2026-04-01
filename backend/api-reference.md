@@ -183,6 +183,324 @@ Requires `accessToken` cookie.
 }
 ```
 
+## Deals Routes
+
+All routes below are prefixed with `/api/deals`.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/deals` | No | List deals with filters, search, and pagination. |
+| `GET` | `/api/deals/featured` | No | Get up to 6 featured active deals. |
+| `GET` | `/api/deals/trending-brands` | No | Get top 8 brands by click count. |
+| `GET` | `/api/deals/:id` | No | Get a single deal by ID. |
+| `POST` | `/api/deals/:id/click` | Yes | Track a deal click and return the affiliate URL. |
+| `POST` | `/api/deals` | Admin | Create a new deal. |
+| `PUT` | `/api/deals/:id` | Admin | Update a deal. |
+| `DELETE` | `/api/deals/:id` | Admin | Delete a deal. |
+
+### Request / Response Details
+
+#### GET /api/deals
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `page` | `number` | `1` | Page number for pagination. |
+| `limit` | `number` | `12` | Number of deals per page. |
+| `category` | `string` | -- | Filter by category slug. |
+| `search` | `string` | -- | Full-text search on title, brand, description. |
+| `brand` | `string` | -- | Filter by brand name (case-insensitive regex). |
+| `featured` | `string` | -- | Set to `"true"` to return only featured deals. |
+| `sort` | `string` | `"-createdAt"` | Mongoose sort string. |
+
+Only active deals that have not expired are returned.
+
+**Response (200):**
+```json
+{
+  "status": "success",
+  "data": {
+    "deals": [ { "...deal object with populated category..." } ],
+    "pagination": {
+      "page": 1,
+      "limit": 12,
+      "total": 42,
+      "pages": 4
+    }
+  }
+}
+```
+
+---
+
+#### GET /api/deals/featured
+
+Returns up to 6 active, featured, non-expired deals sorted by newest first.
+
+**Response (200):**
+```json
+{
+  "status": "success",
+  "data": {
+    "deals": [ { "...deal objects..." } ]
+  }
+}
+```
+
+---
+
+#### GET /api/deals/trending-brands
+
+Returns up to 8 brands aggregated from active deals, sorted by total click count descending. Each entry includes the brand name, total clicks, max cashback percentage, deal count, and category name.
+
+**Response (200):**
+```json
+{
+  "status": "success",
+  "data": {
+    "brands": [
+      {
+        "brand": "Amazon",
+        "totalClicks": 150,
+        "maxCashback": 12,
+        "dealCount": 5,
+        "category": "Shopping"
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### GET /api/deals/:id
+
+**Response (200):**
+```json
+{
+  "status": "success",
+  "data": {
+    "deal": { "...deal object with populated category..." }
+  }
+}
+```
+
+**Error (404):** `"Deal not found"`
+
+---
+
+#### POST /api/deals/:id/click
+
+Requires `accessToken` cookie. Increments the deal's click count and returns the affiliate URL.
+
+**Response (200):**
+```json
+{
+  "status": "success",
+  "data": {
+    "affiliateUrl": "https://example.com/affiliate/..."
+  }
+}
+```
+
+**Error (404):** `"Deal not found"`
+
+---
+
+#### POST /api/deals
+
+Requires `accessToken` cookie and admin role.
+
+**Body:**
+```json
+{
+  "title": "string (required)",
+  "description": "string (required)",
+  "brand": "string (required)",
+  "category": "ObjectId (required, ref: Category)",
+  "cashbackPercent": "number (required, 0-100)",
+  "cashbackType": "string (optional, 'percentage' | 'flat', default: 'percentage')",
+  "flatCashback": "number (optional, min 0, default: 0)",
+  "affiliateUrl": "string (required)",
+  "imageUrl": "string (optional)",
+  "lockPeriodDays": "number (optional, default: 30)",
+  "expiresAt": "Date (required)",
+  "tags": ["string"],
+  "termsAndConditions": "string (optional)",
+  "isActive": "boolean (optional, default: true)",
+  "isFeatured": "boolean (optional, default: false)"
+}
+```
+
+**Response (201):**
+```json
+{
+  "status": "success",
+  "data": {
+    "deal": { "...created deal with populated category..." }
+  }
+}
+```
+
+---
+
+#### PUT /api/deals/:id
+
+Requires `accessToken` cookie and admin role. Accepts any subset of the deal fields.
+
+**Response (200):**
+```json
+{
+  "status": "success",
+  "data": {
+    "deal": { "...updated deal with populated category..." }
+  }
+}
+```
+
+**Error (404):** `"Deal not found"`
+
+---
+
+#### DELETE /api/deals/:id
+
+Requires `accessToken` cookie and admin role.
+
+**Response (200):**
+```json
+{
+  "status": "success",
+  "message": "Deal deleted"
+}
+```
+
+**Error (404):** `"Deal not found"`
+
+---
+
+## Categories Routes
+
+All routes below are prefixed with `/api/categories`.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/categories` | No | List all active categories sorted by `sortOrder`. |
+| `GET` | `/api/categories/:slug` | No | Get a single category by slug. |
+| `POST` | `/api/categories` | Admin | Create a new category. |
+| `PUT` | `/api/categories/:id` | Admin | Update a category. |
+| `DELETE` | `/api/categories/:id` | Admin | Delete a category. |
+
+### Request / Response Details
+
+#### GET /api/categories
+
+Returns all active categories sorted by `sortOrder` ascending.
+
+**Response (200):**
+```json
+{
+  "status": "success",
+  "data": {
+    "categories": [
+      {
+        "_id": "ObjectId",
+        "name": "Shopping",
+        "slug": "shopping",
+        "icon": "shopping-cart",
+        "isActive": true,
+        "sortOrder": 0
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### GET /api/categories/:slug
+
+**Response (200):**
+```json
+{
+  "status": "success",
+  "data": {
+    "category": { "...category object..." }
+  }
+}
+```
+
+**Error (404):** `"Category not found"`
+
+---
+
+#### POST /api/categories
+
+Requires `accessToken` cookie and admin role. The `slug` is auto-generated from the `name` field (lowercased, spaces replaced with hyphens, non-alphanumeric characters removed).
+
+**Body:**
+```json
+{
+  "name": "string (required)",
+  "icon": "string (optional)",
+  "sortOrder": "number (optional, default: 0)"
+}
+```
+
+**Response (201):**
+```json
+{
+  "status": "success",
+  "data": {
+    "category": { "...created category..." }
+  }
+}
+```
+
+---
+
+#### PUT /api/categories/:id
+
+Requires `accessToken` cookie and admin role. If `name` is updated, the `slug` is automatically regenerated.
+
+**Response (200):**
+```json
+{
+  "status": "success",
+  "data": {
+    "category": { "...updated category..." }
+  }
+}
+```
+
+**Error (404):** `"Category not found"`
+
+---
+
+#### DELETE /api/categories/:id
+
+Requires `accessToken` cookie and admin role.
+
+**Response (200):**
+```json
+{
+  "status": "success",
+  "message": "Category deleted"
+}
+```
+
+**Error (404):** `"Category not found"`
+
+---
+
+## Banners Routes
+
+> **Note:** The Banners module is planned but not yet implemented. The routes below document the intended API surface based on the project design.
+
+Banners will be managed at `/api/banners` with admin-only CRUD and public listing, following the same patterns as the Deals and Categories modules.
+
+---
+
 ## Error Responses
 
 All errors follow this shape:
