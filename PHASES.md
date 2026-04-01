@@ -35,7 +35,8 @@ ChingiRingi development is organized into 4 phases, progressing from core functi
 | Wire Profile + EditProfile to API | `feature/wire-frontend-apis` | Done |
 | Wire MyAddressScreen to API | `feature/wire-frontend-apis` | Done |
 | Wire SettingsScreen (delete account) | `feature/wire-frontend-apis` | Done |
-| Mobile responsive layouts (all screens) | `feature/mobile-layouts` | Not started |
+| Mobile responsive layouts (all screens) | `feature/mobile-layouts` | Done |
+| Backend API tests (Jest + Supertest) | `feature/mobile-layouts` | Done |
 
 ### Milestone
 
