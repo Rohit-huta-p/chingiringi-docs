@@ -2,6 +2,7 @@
 
 * [Introduction](README.md)
 * [Getting Started](getting-started.md)
+* [Development Phases](PHASES.md)
 
 ## Architecture
 
