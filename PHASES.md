@@ -22,19 +22,19 @@ ChingiRingi development is organized into 4 phases, progressing from core functi
 | Feature | Branch | Status |
 |---------|--------|--------|
 | Deals API (CRUD, search, categories, banners) | `feature/deals-api` | Done |
-| Wallet API (balance, transaction history) | `feature/wallet-api` | Not started |
-| Profile API (update profile, avatar upload) | `feature/profile-api` | Not started |
-| Address API (CRUD addresses) | `feature/address-api` | Not started |
+| Wallet API (balance, transaction history) | `feature/wallet-api` | Done |
+| Profile API (update profile, avatar upload) | `feature/profile-address-api` | Done |
+| Address API (CRUD addresses) | `feature/profile-address-api` | Done |
 
 ### Frontend
 
 | Feature | Branch | Status |
 |---------|--------|--------|
-| Wire HomeScreen to deals API | `feature/wire-home` | Not started |
-| Wire WalletScreen to wallet API | `feature/wire-wallet` | Not started |
-| Wire Profile + EditProfile to API | `feature/wire-profile` | Not started |
-| Wire MyAddressScreen to API | `feature/wire-address` | Not started |
-| Wire SettingsScreen (delete account) | `feature/wire-settings` | Not started |
+| Wire HomeScreen to deals API | `feature/wire-frontend-apis` | Done |
+| Wire WalletScreen to wallet API | `feature/wire-frontend-apis` | Done |
+| Wire Profile + EditProfile to API | `feature/wire-frontend-apis` | Done |
+| Wire MyAddressScreen to API | `feature/wire-frontend-apis` | Done |
+| Wire SettingsScreen (delete account) | `feature/wire-frontend-apis` | Done |
 | Mobile responsive layouts (all screens) | `feature/mobile-layouts` | Not started |
 
 ### Milestone
