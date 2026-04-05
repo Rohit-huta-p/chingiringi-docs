@@ -1,516 +1,279 @@
 # API Reference
 
-Base path: all auth routes are mounted at `/auth` (see `app.js`).
+**Base URL:** `http://localhost:8000` (development)
 
-A global rate limiter applies to all routes: **100 requests per 15 minutes** per IP.
+**Global rate limit:** 100 requests per 15 minutes per IP (applies to all routes).
+
+---
 
 ## Health Check
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/health` | No | Returns `{ status: 'success', message: 'API is running' }` |
+| `GET` | `/health` | No | Returns `{ "status": "success", "message": "API is running" }` |
 
-## Authentication Routes
+---
 
-All routes below are prefixed with `/auth`. Routes marked with a lock icon require a valid access token cookie.
+## Authentication (`/auth`)
 
-| Method | Path | Auth | Rate Limited | Description |
-|---|---|---|---|---|
-| `POST` | `/auth/signup` | No | Global only | Create a new user account. Creates an associated wallet automatically. |
-| `POST` | `/auth/login` | No | 5 req/min | Log in with identifier (email or username) + password, or identifier + OTP. |
-| `POST` | `/auth/send-otp` | No | 5 req/min | Generate and send a 6-digit OTP to a phone number or email. |
-| `POST` | `/auth/verify-otp` | No | 5 req/min | Verify an OTP. If the identifier belongs to an existing user, tokens are issued. |
-| `POST` | `/auth/logout` | Yes | Global only | Revoke the current refresh token and clear auth cookies. |
-| `POST` | `/auth/refresh` | No (cookie) | Global only | Exchange a valid refresh token cookie for new access + refresh tokens. |
-| `POST` | `/auth/forgot-password` | No | Global only | Send a password-reset OTP to the provided email. |
-| `POST` | `/auth/reset-password` | No | Global only | Reset password using email, OTP, and new password. |
-| `GET` | `/auth/me` | Yes | Global only | Return the authenticated user's profile data. |
+Rate limited to **5 requests/min** per IP on login, send-otp, and verify-otp routes.
 
-### Request / Response Details
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/auth/signup` | No | Create account + wallet. Returns tokens in body (native) + sets cookies (web). |
+| `POST` | `/auth/login` | No | Login with identifier + password or OTP. |
+| `POST` | `/auth/send-otp` | No | Generate 6-digit OTP for phone or email. TTL: 5 min, max 3 attempts. |
+| `POST` | `/auth/verify-otp` | No | Verify OTP. Issues tokens if identifier matches a registered user. |
+| `POST` | `/auth/logout` | Yes | Revoke refresh token, clear cookies. |
+| `POST` | `/auth/refresh` | No | Rotate token pair. Accepts cookie (web) or `{ refreshToken }` body (native). |
+| `POST` | `/auth/forgot-password` | No | Send password-reset OTP to email. |
+| `POST` | `/auth/reset-password` | No | Reset password with OTP verification. |
+| `GET` | `/auth/me` | Yes | Return authenticated user's profile. |
 
-#### POST /auth/signup
+### POST /auth/signup
 
-**Body:**
 ```json
+// Request body
 {
   "name": "string (required)",
   "username": "string (min 3 chars, required)",
-  "email": "string (optional, valid email)",
+  "email": "string (optional)",
   "phone": "string (optional, min 10 chars)",
   "password": "string (min 6 chars, required)"
 }
+// At least one of email or phone required.
+
+// Response 201
+{
+  "status": "success",
+  "message": "Account created",
+  "tokens": { "accessToken": "...", "refreshToken": "..." }  // native only
+}
+// Web: also sets accessToken + refreshToken as HTTP-only cookies
 ```
-At least one of `email` or `phone` must be provided.
 
-**Response (201):**
+### POST /auth/login
+
 ```json
-{ "status": "success", "message": "Account created efficiently" }
-```
-Sets `accessToken` and `refreshToken` cookies.
-
----
-
-#### POST /auth/login
-
-**Body:**
-```json
+// Request body
 {
   "identifier": "string (email, username, or phone)",
-  "password": "string (optional)",
+  "password": "string (optional — provide password OR otp)",
   "otp": "string (optional)"
 }
-```
-Must provide either `password` or `otp`.
 
-**Response (200):**
-```json
-{ "status": "success", "message": "Logged in successfully" }
-```
-Sets `accessToken` and `refreshToken` cookies.
-
----
-
-#### POST /auth/send-otp
-
-**Body:**
-```json
-{
-  "phone": "string (optional)",
-  "email": "string (optional)"
-}
-```
-At least one of `phone` or `email` required.
-
-**Response (200):**
-```json
-{ "status": "success", "message": "OTP sent successfully" }
-```
-
----
-
-#### POST /auth/verify-otp
-
-**Body:**
-```json
-{
-  "identifier": "string (phone or email)",
-  "otp": "string (exactly 6 chars)"
-}
-```
-
-**Response (200):**
-```json
-{ "status": "success", "message": "OTP verified successfully", "data": { "isLogin": true } }
-```
-If the identifier matches an existing user, auth cookies are set and `isLogin` is `true`.
-
----
-
-#### POST /auth/logout
-
-Requires `accessToken` cookie.
-
-**Response (200):**
-```json
-{ "status": "success", "message": "Logged out successfully" }
-```
-Clears both auth cookies and removes the refresh token from the database.
-
----
-
-#### POST /auth/refresh
-
-Requires `refreshToken` cookie (no access token needed).
-
-**Response (200):**
-```json
-{ "status": "success", "message": "Tokens refreshed" }
-```
-Rotates both tokens. The old refresh token is revoked.
-
----
-
-#### POST /auth/forgot-password
-
-**Body:**
-```json
-{ "email": "string (valid email)" }
-```
-
-**Response (200):**
-```json
-{ "status": "success", "message": "Password reset OTP sent to email" }
-```
-
----
-
-#### POST /auth/reset-password
-
-**Body:**
-```json
-{
-  "email": "string (valid email)",
-  "otp": "string (exactly 6 chars)",
-  "newPassword": "string (min 6 chars)"
-}
-```
-
-**Response (200):**
-```json
-{ "status": "success", "message": "Password reset successfully" }
-```
-
----
-
-#### GET /auth/me
-
-Requires `accessToken` cookie.
-
-**Response (200):**
-```json
+// Response 200
 {
   "status": "success",
-  "data": {
-    "user": {
-      "id": "ObjectId",
-      "name": "string",
-      "username": "string",
-      "email": "string",
-      "phone": "string",
-      "role": "user | admin"
-    }
-  }
+  "message": "Logged in successfully",
+  "user": { "_id": "...", "name": "...", "email": "...", "role": "user|admin", ... },
+  "tokens": { "accessToken": "...", "refreshToken": "..." }  // native only
 }
 ```
 
-## Deals Routes
+### POST /auth/refresh
 
-All routes below are prefixed with `/api/deals`.
+```json
+// Request body (native only — web uses cookie automatically)
+{ "refreshToken": "string" }
+
+// Response 200
+{
+  "status": "success",
+  "tokens": { "accessToken": "...", "refreshToken": "..." }  // native
+}
+// Web: rotates both cookies
+```
+
+---
+
+## Deals (`/api/deals`)
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/deals` | No | List deals with filters, search, and pagination. |
-| `GET` | `/api/deals/featured` | No | Get up to 6 featured active deals. |
-| `GET` | `/api/deals/trending-brands` | No | Get top 8 brands by click count. |
-| `GET` | `/api/deals/:id` | No | Get a single deal by ID. |
-| `POST` | `/api/deals/:id/click` | Yes | Track a deal click and return the affiliate URL. |
-| `POST` | `/api/deals` | Admin | Create a new deal. |
-| `PUT` | `/api/deals/:id` | Admin | Update a deal. |
-| `DELETE` | `/api/deals/:id` | Admin | Delete a deal. |
+| `GET` | `/api/deals` | No | List deals — supports `page`, `limit`, `category`, `search`, `featured`, `brand` query params |
+| `GET` | `/api/deals/featured` | No | Return featured deals (`isFeatured: true`) |
+| `GET` | `/api/deals/trending-brands` | No | Aggregation of top brands by click count |
+| `GET` | `/api/deals/:id` | No | Get single deal by ID |
+| `POST` | `/api/deals/:id/click` | Yes | Increment click count, return `affiliateUrl` |
+| `POST` | `/api/deals` | Yes + Admin | Create new deal |
+| `PUT` | `/api/deals/:id` | Yes + Admin | Update deal fields |
+| `DELETE` | `/api/deals/:id` | Yes + Admin | Delete deal |
 
-### Request / Response Details
+### Deal Object Fields
 
-#### GET /api/deals
-
-**Query Parameters:**
-
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `page` | `number` | `1` | Page number for pagination. |
-| `limit` | `number` | `12` | Number of deals per page. |
-| `category` | `string` | -- | Filter by category slug. |
-| `search` | `string` | -- | Full-text search on title, brand, description. |
-| `brand` | `string` | -- | Filter by brand name (case-insensitive regex). |
-| `featured` | `string` | -- | Set to `"true"` to return only featured deals. |
-| `sort` | `string` | `"-createdAt"` | Mongoose sort string. |
-
-Only active deals that have not expired are returned.
-
-**Response (200):**
-```json
-{
-  "status": "success",
-  "data": {
-    "deals": [ { "...deal object with populated category..." } ],
-    "pagination": {
-      "page": 1,
-      "limit": 12,
-      "total": 42,
-      "pages": 4
-    }
-  }
-}
-```
+| Field | Type | Notes |
+|---|---|---|
+| `title` | String | Required |
+| `description` | String | — |
+| `brand` | String | Required |
+| `category` | ObjectId | Ref: Category |
+| `cashbackType` | `'percentage'` \| `'flat'` | Default: `'percentage'` |
+| `cashbackPercent` | Number | 0–100. Used when `cashbackType === 'percentage'` |
+| `flatCashback` | Number | Used when `cashbackType === 'flat'` |
+| `affiliateUrl` | String | Required — the actual affiliate link |
+| `imageUrl` | String | — |
+| `lockPeriodDays` | Number | Default: 30 |
+| `expiresAt` | Date | Required |
+| `tags` | String[] | — |
+| `termsAndConditions` | String | Newline-separated terms |
+| `isActive` | Boolean | Default: true |
+| `isFeatured` | Boolean | Default: false |
+| `clickCount` | Number | Incremented by `/click` route |
+| `conversionCount` | Number | Updated by Admitad webhook (planned) |
 
 ---
 
-#### GET /api/deals/featured
-
-Returns up to 6 active, featured, non-expired deals sorted by newest first.
-
-**Response (200):**
-```json
-{
-  "status": "success",
-  "data": {
-    "deals": [ { "...deal objects..." } ]
-  }
-}
-```
-
----
-
-#### GET /api/deals/trending-brands
-
-Returns up to 8 brands aggregated from active deals, sorted by total click count descending. Each entry includes the brand name, total clicks, max cashback percentage, deal count, and category name.
-
-**Response (200):**
-```json
-{
-  "status": "success",
-  "data": {
-    "brands": [
-      {
-        "brand": "Amazon",
-        "totalClicks": 150,
-        "maxCashback": 12,
-        "dealCount": 5,
-        "category": "Shopping"
-      }
-    ]
-  }
-}
-```
-
----
-
-#### GET /api/deals/:id
-
-**Response (200):**
-```json
-{
-  "status": "success",
-  "data": {
-    "deal": { "...deal object with populated category..." }
-  }
-}
-```
-
-**Error (404):** `"Deal not found"`
-
----
-
-#### POST /api/deals/:id/click
-
-Requires `accessToken` cookie. Increments the deal's click count and returns the affiliate URL.
-
-**Response (200):**
-```json
-{
-  "status": "success",
-  "data": {
-    "affiliateUrl": "https://example.com/affiliate/..."
-  }
-}
-```
-
-**Error (404):** `"Deal not found"`
-
----
-
-#### POST /api/deals
-
-Requires `accessToken` cookie and admin role.
-
-**Body:**
-```json
-{
-  "title": "string (required)",
-  "description": "string (required)",
-  "brand": "string (required)",
-  "category": "ObjectId (required, ref: Category)",
-  "cashbackPercent": "number (required, 0-100)",
-  "cashbackType": "string (optional, 'percentage' | 'flat', default: 'percentage')",
-  "flatCashback": "number (optional, min 0, default: 0)",
-  "affiliateUrl": "string (required)",
-  "imageUrl": "string (optional)",
-  "lockPeriodDays": "number (optional, default: 30)",
-  "expiresAt": "Date (required)",
-  "tags": ["string"],
-  "termsAndConditions": "string (optional)",
-  "isActive": "boolean (optional, default: true)",
-  "isFeatured": "boolean (optional, default: false)"
-}
-```
-
-**Response (201):**
-```json
-{
-  "status": "success",
-  "data": {
-    "deal": { "...created deal with populated category..." }
-  }
-}
-```
-
----
-
-#### PUT /api/deals/:id
-
-Requires `accessToken` cookie and admin role. Accepts any subset of the deal fields.
-
-**Response (200):**
-```json
-{
-  "status": "success",
-  "data": {
-    "deal": { "...updated deal with populated category..." }
-  }
-}
-```
-
-**Error (404):** `"Deal not found"`
-
----
-
-#### DELETE /api/deals/:id
-
-Requires `accessToken` cookie and admin role.
-
-**Response (200):**
-```json
-{
-  "status": "success",
-  "message": "Deal deleted"
-}
-```
-
-**Error (404):** `"Deal not found"`
-
----
-
-## Categories Routes
-
-All routes below are prefixed with `/api/categories`.
+## Categories (`/api/categories`)
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/categories` | No | List all active categories sorted by `sortOrder`. |
-| `GET` | `/api/categories/:slug` | No | Get a single category by slug. |
-| `POST` | `/api/categories` | Admin | Create a new category. |
-| `PUT` | `/api/categories/:id` | Admin | Update a category. |
-| `DELETE` | `/api/categories/:id` | Admin | Delete a category. |
+| `GET` | `/api/categories` | No | List all active categories (sorted by `sortOrder`) |
+| `GET` | `/api/categories/:slug` | No | Get category by slug |
+| `POST` | `/api/categories` | Yes + Admin | Create category |
+| `PUT` | `/api/categories/:id` | Yes + Admin | Update category |
+| `DELETE` | `/api/categories/:id` | Yes + Admin | Delete category |
 
-### Request / Response Details
+---
 
-#### GET /api/categories
+## Banners (`/api/banners`)
 
-Returns all active categories sorted by `sortOrder` ascending.
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/banners` | No | List banners. Optional `?position=hero\|sidebar` filter |
+| `POST` | `/api/banners` | Yes + Admin | Create banner |
+| `PUT` | `/api/banners/:id` | Yes + Admin | Update banner |
+| `DELETE` | `/api/banners/:id` | Yes + Admin | Delete banner |
 
-**Response (200):**
+---
+
+## Profile (`/api/profile`)
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/profile` | Yes | Get current user's full profile |
+| `PUT` | `/api/profile` | Yes | Update name, email, phone |
+| `DELETE` | `/api/profile` | Yes | Soft-delete account (30-day grace period) |
+
+---
+
+## Addresses (`/api/addresses`)
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/addresses` | Yes | List all addresses for current user |
+| `POST` | `/api/addresses` | Yes | Create new address |
+| `PUT` | `/api/addresses/:id` | Yes | Update address fields |
+| `DELETE` | `/api/addresses/:id` | Yes | Delete address |
+| `PATCH` | `/api/addresses/:id/default` | Yes | Set address as default |
+
+### Address Object Fields
+
+| Field | Type | Notes |
+|---|---|---|
+| `label` | `'home'` \| `'work'` \| `'other'` | Required |
+| `fullName` | String | Required |
+| `phone` | String | Required |
+| `addressLine1` | String | Required |
+| `addressLine2` | String | Optional |
+| `city` | String | Required |
+| `state` | String | Required |
+| `pincode` | String | Required — 6 digits |
+| `isDefault` | Boolean | Default: false |
+
+---
+
+## Wallet (`/api/wallet`)
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/wallet` | Yes | Get wallet with all 4 balance fields |
+| `GET` | `/api/wallet/summary` | Yes | Wallet + recent 5 transactions in one response |
+| `GET` | `/api/wallet/transactions` | Yes | Paginated transaction history. Params: `type`, `status`, `period` (`7d`\|`30d`\|`90d`\|`all`), `page`, `limit` |
+| `GET` | `/api/wallet/transactions/:id` | Yes | Get single transaction by ID |
+
+### Wallet Response
+
 ```json
 {
-  "status": "success",
-  "data": {
-    "categories": [
-      {
-        "_id": "ObjectId",
-        "name": "Shopping",
-        "slug": "shopping",
-        "icon": "shopping-cart",
-        "isActive": true,
-        "sortOrder": 0
-      }
-    ]
+  "wallet": {
+    "pendingCashback": 250,
+    "confirmedCashback": 1000,
+    "coins": 450,
+    "lifetimeEarned": 3200
   }
 }
 ```
 
 ---
 
-#### GET /api/categories/:slug
+## Admin (`/api/admin`)
 
-**Response (200):**
+All admin routes require `protect` + `admin` middleware (user must be authenticated with `role: 'admin'`).
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/admin/dashboard` | Yes + Admin | Aggregated KPIs: clicks, conversions, cashback issued, active users; coins economy stats; top 5 deals; top 5 users |
+| `GET` | `/api/admin/users` | Yes + Admin | Paginated user list. Params: `page`, `limit`, `search` |
+| `GET` | `/api/admin/deals` | Yes + Admin | Paginated deal list. Params: `page`, `limit` |
+
+### Dashboard Response Shape
+
 ```json
 {
-  "status": "success",
-  "data": {
-    "category": { "...category object..." }
-  }
-}
-```
-
-**Error (404):** `"Category not found"`
-
----
-
-#### POST /api/categories
-
-Requires `accessToken` cookie and admin role. The `slug` is auto-generated from the `name` field (lowercased, spaces replaced with hyphens, non-alphanumeric characters removed).
-
-**Body:**
-```json
-{
-  "name": "string (required)",
-  "icon": "string (optional)",
-  "sortOrder": "number (optional, default: 0)"
-}
-```
-
-**Response (201):**
-```json
-{
-  "status": "success",
-  "data": {
-    "category": { "...created category..." }
-  }
+  "stats": {
+    "totalClicks": 1250,
+    "conversions": 87,
+    "cashbackIssued": 45000,
+    "activeUsers": 320
+  },
+  "coinsEconomy": {
+    "totalCoinsIssued": 15000,
+    "totalCoinsRedeemed": 3200,
+    "activeCoinsHolders": 180
+  },
+  "topDeals": [ { "title": "...", "brand": "...", "clickCount": 120 }, ... ],
+  "topUsers": [ { "name": "...", "lifetimeEarned": 2400 }, ... ]
 }
 ```
 
 ---
 
-#### PUT /api/categories/:id
+## Planned Endpoints (Not Yet Built)
 
-Requires `accessToken` cookie and admin role. If `name` is updated, the `slug` is automatically regenerated.
-
-**Response (200):**
-```json
-{
-  "status": "success",
-  "data": {
-    "category": { "...updated category..." }
-  }
-}
-```
-
-**Error (404):** `"Category not found"`
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/webhooks/admitad` | Receive conversion callbacks from Admitad |
+| `POST` | `/api/withdrawals` | Request cashback withdrawal |
+| `GET` | `/api/withdrawals` | User's withdrawal history |
+| `GET` | `/api/referrals/stats` | Referral count, earnings stats |
+| `POST` | `/api/notifications/register` | Register device token for push notifications |
+| `GET` | `/api/notifications` | User's notification feed |
+| `GET` | `/api/admin/withdrawals` | Admin withdrawal queue |
+| `POST` | `/api/admin/withdrawals/:id/approve` | Approve + trigger Razorpay X payout |
+| `POST` | `/api/admin/conversions/:id/approve` | Approve Admitad conversion → confirm cashback |
 
 ---
 
-#### DELETE /api/categories/:id
+## Error Response Format
 
-Requires `accessToken` cookie and admin role.
-
-**Response (200):**
-```json
-{
-  "status": "success",
-  "message": "Category deleted"
-}
-```
-
-**Error (404):** `"Category not found"`
-
----
-
-## Banners Routes
-
-> **Note:** The Banners module is planned but not yet implemented. The routes below document the intended API surface based on the project design.
-
-Banners will be managed at `/api/banners` with admin-only CRUD and public listing, following the same patterns as the Deals and Categories modules.
-
----
-
-## Error Responses
-
-All errors follow this shape:
+All errors follow a consistent shape:
 
 ```json
 {
   "status": "error",
-  "message": "Human-readable error message",
-  "stack": "Stack trace (development only)"
+  "message": "Human-readable error description"
 }
 ```
 
-Common status codes: `400` (validation), `401` (unauthorized), `404` (not found), `429` (rate limited), `500` (server error).
+Common status codes:
+
+| Code | Meaning |
+|---|---|
+| `400` | Validation error or bad request |
+| `401` | Not authenticated (missing or expired token) |
+| `403` | Authenticated but not authorized (e.g., non-admin hitting admin route) |
+| `404` | Resource not found |
+| `409` | Conflict (e.g., duplicate email/username on signup) |
+| `429` | Rate limit exceeded |
+| `500` | Unhandled server error |

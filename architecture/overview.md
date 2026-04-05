@@ -1,156 +1,240 @@
 # Architecture Overview
 
-ChingiRingi follows a standard client-server architecture with a React Native frontend communicating with an Express.js REST API backed by MongoDB.
+ChingiRingi is a multi-platform cashback and rewards app built with React Native (Expo) on the frontend and Node.js/Express on the backend, backed by MongoDB Atlas.
 
 ---
 
 ## System Diagram
 
 ```
-+---------------------------+          HTTPS / HTTP           +---------------------------+
-|                           |  ───────────────────────────>   |                           |
-|   React Native (Expo)     |                                 |   Express.js API          |
-|   chingiring-app/         |  <───────────────────────────   |   backend/src/            |
-|                           |     JSON + HTTP-Only Cookies    |                           |
-+---------------------------+                                 +---------------------------+
-                                                                        |
-                                                                        |  Mongoose ODM
-                                                                        v
-                                                              +---------------------------+
-                                                              |                           |
-                                                              |   MongoDB                 |
-                                                              |                           |
-                                                              +---------------------------+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                            CLIENT LAYER                                 │
+│                                                                         │
+│  ┌─────────────┐    ┌─────────────┐    ┌──────────────────────────────┐ │
+│  │  iOS App     │    │ Android App │    │     Web Application          │ │
+│  │  (Expo/RN)  │    │  (Expo/RN)  │    │     (Expo Web / RN Web)      │ │
+│  └──────┬──────┘    └──────┬──────┘    └─────────────┬────────────────┘ │
+│         │                  │                         │                  │
+│   Bearer Token         Bearer Token            Cookie Auth              │
+│   expo-secure-store    expo-secure-store        HTTP-only cookies       │
+│         └──────────────────┴────────────── ─────────┘                  │
+│                            │                                            │
+│              ┌─────────────┴──────────────┐                             │
+│              │  Axios + React Query        │                             │
+│              │  (Interceptors: attach      │                             │
+│              │   token, refresh on 401)    │                             │
+│              └─────────────┬──────────────┘                             │
+└────────────────────────────┼────────────────────────────────────────────┘
+                             │ HTTPS
+                             ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                            API LAYER                                    │
+│                                                                         │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │                     Express.js / Node.js                          │  │
+│  │                                                                   │  │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐ │  │
+│  │  │ Helmet   │  │  CORS    │  │  Rate    │  │  Cookie Parser   │ │  │
+│  │  │(Security)│  │(Origins) │  │ Limiter  │  │  (cookie-parser) │ │  │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────────────┘ │  │
+│  │                                                                   │  │
+│  │  Route Modules:                                                   │  │
+│  │  /auth/*          (Built — signup, login, OTP, refresh, logout)  │  │
+│  │  /api/deals/*     (Built — CRUD, search, click tracking)         │  │
+│  │  /api/categories  (Built — CRUD)                                 │  │
+│  │  /api/banners     (Built — CRUD)                                 │  │
+│  │  /api/profile     (Built — view, update, delete)                 │  │
+│  │  /api/addresses   (Built — CRUD, set default)                    │  │
+│  │  /api/wallet      (Built — balance, transactions, summary)       │  │
+│  │  /api/admin       (Built — dashboard, user list, deal list)      │  │
+│  │  /api/webhooks    (Planned — Admitad conversion callbacks)       │  │
+│  │  /api/withdrawals (Planned — Razorpay X payout)                  │  │
+│  │                                                                   │  │
+│  │  ┌──────────────┐  ┌────────────────┐  ┌─────────────────────┐  │  │
+│  │  │  Zod         │  │  JWT Auth      │  │  Global Error       │  │  │
+│  │  │  (Validation)│  │  Middleware    │  │  Handler            │  │  │
+│  │  └──────────────┘  └────────────────┘  └─────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────┬───────────────────────────┘
+                                              │
+                                              ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                            DATA LAYER                                   │
+│                                                                         │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │                  MongoDB Atlas (Mongoose ODM)                      │  │
+│  │                                                                   │  │
+│  │  Collections (Built):                                             │  │
+│  │  users  wallets  otps(TTL)  deals  categories  banners            │  │
+│  │  addresses  transactions                                          │  │
+│  │                                                                   │  │
+│  │  Planned: products  orders  notifications  merchants  coupons    │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
+
+                         EXTERNAL SERVICES (Planned)
+┌─────────────────────────────────────────────────────────────────────────┐
+│  ┌──────────┐  ┌────────────┐  ┌──────────┐  ┌────────┐  ┌──────────┐  │
+│  │ Admitad  │  │ Razorpay X │  │  MSG91   │  │  FCM   │  │  S3/CDN  │  │
+│  │Affiliate │  │  Payouts   │  │  OTP SMS │  │  Push  │  │  Assets  │  │
+│  └──────────┘  └────────────┘  └──────────┘  └────────┘  └──────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## How Frontend and Backend Connect
+## Authentication Architecture
 
-The frontend uses an Axios client (`chingiring-app/src/api/client.ts`) configured with `withCredentials: true` to send and receive HTTP-only cookies on every request. The base URL is determined by platform: `localhost` for web builds, a LAN IP for native device testing, or an override via the `EXPO_PUBLIC_API_URL` environment variable.
+ChingiRingi uses a **dual authentication strategy** — the approach differs between web and native platforms because HTTP-only cookies don't persist reliably in React Native.
 
-All API calls are routed through this single Axios instance, which includes a response interceptor for automatic token refresh (see Auth Flow below).
+### Web (Expo Web / Browser)
 
----
+- Backend sets `accessToken` and `refreshToken` as HTTP-only cookies
+- Axios sends cookies automatically with every request (`withCredentials: true`)
+- Tokens are never accessible in JavaScript — protected from XSS
 
-## Authentication Flow
+### Native (iOS / Android)
 
-ChingiRingi uses a **cookie-based JWT authentication** strategy. No tokens are stored in client-side JavaScript; instead, the server sets HTTP-only cookies that the browser or network stack attaches automatically.
+- Backend returns tokens in the JSON response body (`response.data.tokens`)
+- Frontend stores them in `expo-secure-store` (encrypted native keychain)
+- Axios attaches `Authorization: Bearer <token>` on every request via a request interceptor
+- `POST /auth/refresh` accepts `{ refreshToken }` in the request body (no cookies)
 
-### Token Pair
+### Token Lifecycle
 
-| Token | Storage | Lifetime | Purpose |
-|---|---|---|---|
-| `accessToken` | HTTP-only cookie | 15 minutes | Authorizes API requests |
-| `refreshToken` | HTTP-only cookie | 30 days | Obtains a new access token silently |
+| Token | Lifetime | Purpose |
+|---|---|---|
+| `accessToken` | 15 minutes | Authorizes API calls |
+| `refreshToken` | 30 days | Silently replaces expired access tokens |
 
-### Login Sequence
-
-```
-1. User submits credentials
-2. POST /auth/login
-3. Server validates credentials (bcrypt compare)
-4. Server generates accessToken + refreshToken (JWT)
-5. Server sets both as HTTP-only cookies on the response
-6. Client receives 200 OK with user data
-7. Zustand auth store sets isAuthenticated = true
-8. RootNavigator switches from AuthNavigator to DrawerNavigator
-```
-
-### Silent Refresh
-
-The Axios response interceptor in `client.ts` handles 401 errors automatically:
+### Silent Refresh (Axios Interceptor)
 
 ```
-1. API request returns 401
-2. Interceptor fires POST /auth/refresh (cookies sent automatically)
-3. Server verifies the refresh token, issues a new access token cookie
-4. Interceptor retries the original failed request
-5. If refresh also fails, the user is returned to the login screen
+API request → 401 response
+  → Interceptor calls POST /auth/refresh
+    → Web: sends refreshToken cookie automatically
+    → Native: sends { refreshToken } from SecureStore in request body
+  → Server validates, issues new token pair
+  → Interceptor retries the original request
+  → If refresh also fails → logout + redirect to login screen
 ```
 
 ### Session Hydration on App Start
 
-When the app launches, `App.tsx` calls `useAuthStore.hydrate()`, which hits `GET /auth/me`. If the access token cookie is still valid (or can be silently refreshed), the user is kept authenticated. Otherwise, the auth state resets and the login screen is shown.
+On launch, `App.tsx` calls `useAuthStore.hydrate()`, which calls `GET /auth/me`:
+- If access token is valid → user stays authenticated
+- If expired → silent refresh runs → if refresh succeeds → stays authenticated
+- If refresh fails → auth state cleared → login screen shown
 
 ### Security Measures
 
-- **HTTP-only cookies** prevent XSS-based token theft.
-- **Secure flag** is enabled in production (HTTPS only).
-- **SameSite** is set to `none` in production for cross-site cookie support, `lax` in development.
-- **Refresh token rotation**: tokens are stored in the user document and capped at 5 entries.
-- **Rate limiting**: auth endpoints are limited to 5 requests per minute; global limit is 100 requests per 15 minutes.
-- **Helmet** sets security-related HTTP headers.
-- **Zod** is used for request validation on the backend.
+- HTTP-only cookies prevent XSS token theft (web)
+- `expo-secure-store` is OS-level encrypted storage (native)
+- Refresh tokens are stored hashed in the user document, capped at 5 active sessions
+- Auth endpoints rate-limited to 5 req/min; global limit 100 req/15min
+- Helmet sets XSS protection, content-type sniffing prevention, clickjacking headers
+- Zod validates all request bodies before they reach controllers
 
 ---
 
 ## Navigation Architecture
 
-The app uses React Navigation with a conditional root:
+Navigation is handled by React Navigation v7, with a conditional root driven by Zustand auth state.
 
 ```
-RootNavigator
-  |
-  +-- isAuthenticated === false
-  |     AuthNavigator (Native Stack)
-  |       Login
-  |       Signup
-  |       OTPVerification
-  |       ForgotPassword
-  |       ResetPassword
-  |
-  +-- isAuthenticated === true
-        DrawerNavigator (Permanent Drawer)
-          Home
-          Wallet
-          Referrals
-          Notifications
-          Settings
-          Profile
-          EditProfile
-          MyAddress
-          TransactionHistory
-          ProductDetail
+RootNavigator (NavigationContainer)
+  │
+  ├── isAuthenticated === false
+  │     AuthNavigator (NativeStackNavigator)
+  │       Login, Signup, OTPVerification, ForgotPassword, ResetPassword
+  │
+  └── isAuthenticated === true
+        │
+        ├── user.role === 'admin'
+        │     AdminNavigator (responsive)
+        │       Mobile  → Stack (AdminDashboard + all admin screens)
+        │       Web/Desktop → lazy DesktopAdminDrawer (permanent sidebar)
+        │
+        └── user.role === 'user'
+              ResponsiveNavigator
+                Mobile/Native → MobileNavigator
+                │               Stack wrapping BottomTabNavigator
+                │               Tabs: Home, Wallet, Referrals, Notifications, Settings
+                │               Stack routes: Profile, EditProfile, MyAddress,
+                │                             AddEditAddress, TransactionHistory, ProductDetail
+                │
+                └── Web/Desktop (width ≥ 768) → lazy DesktopDrawerNavigator
+                                                  Permanent sidebar (250px expanded / 80px collapsed)
+                                                  Same routes as MobileNavigator
 ```
 
-The `isAuthenticated` flag in the Zustand auth store drives which navigator tree is rendered. There is no manual navigation between auth and dashboard screens; the entire tree swaps reactively.
+**Key design decisions:**
+- `react-native-reanimated` (required by drawer) is only imported inside `DesktopDrawerNavigator.tsx` and `DesktopAdminDrawer.tsx`, which are lazy-loaded via `React.lazy()` + `Suspense`. This prevents the TurboModule crash on Android/iOS with Expo Go.
+- On native platforms (`Platform.OS !== 'web'`), the mobile navigator is always used, regardless of screen width.
+- Role-based routing happens at the root — admins and regular users never share a navigator tree.
 
 ---
 
 ## State Management
 
-The app uses **Zustand** for global state, split into two stores:
-
 | Store | File | Responsibility |
 |---|---|---|
-| `useAuthStore` | `src/store/index.ts` | Authentication state, user data, hydration, logout |
-| `useUIStore` | `src/store/uiStore.ts` | UI preferences (sidebar collapsed state) |
+| `useAuthStore` | `src/store/index.ts` | Auth state, user object, hydration on app start, logout (clears SecureStore + cookies) |
+| `useUIStore` | `src/store/uiStore.ts` | Sidebar collapsed/expanded state |
 
-Server state (data fetching, caching, mutations) is handled by **TanStack React Query** via the `QueryClientProvider` in `App.tsx`.
+Server state (data fetching, caching, mutations) is handled by **TanStack React Query** via `QueryClientProvider` in `App.tsx`.
 
 ---
 
 ## Backend Module Structure
 
-The backend follows a **modular architecture** where each domain is self-contained:
+Each domain is self-contained with its own controller, routes, and service/model:
 
 ```
-backend/src/modules/
-  auth/
-    authController.js   # Request handlers
-    authRoutes.js        # Route definitions
-    authService.js       # Business logic
-  otp/
-    otpModel.js          # OTP Mongoose model
-  users/
-    userModel.js         # User Mongoose model
-  wallet/
-    walletModel.js       # Wallet Mongoose model
+backend/src/
+  app.js                         ← Express setup, CORS, middleware, route mounting
+  modules/
+    auth/
+      authController.js          ← Request handlers (signup, login, logout, refresh…)
+      authRoutes.js               ← Route definitions + rate limiters
+      authService.js              ← Business logic (create user, generate tokens…)
+    users/
+      userModel.js                ← Mongoose schema (User)
+    wallet/
+      walletModel.js              ← Mongoose schema (Wallet)
+      walletController.js         ← Balance, summary, transaction history
+      walletRoutes.js
+    deals/
+      dealModel.js                ← Mongoose schema (Deal)
+      dealController.js           ← CRUD, search, click tracking, featured, trending brands
+      dealRoutes.js
+    categories/
+      categoryModel.js
+      categoryController.js
+      categoryRoutes.js
+    banners/
+      bannerModel.js
+      bannerController.js
+      bannerRoutes.js
+    users/ (profile)
+      profileController.js        ← GET/PUT/DELETE /api/profile
+      profileRoutes.js
+    addresses/
+      addressModel.js
+      addressController.js        ← CRUD + set default
+      addressRoutes.js
+    transactions/
+      transactionModel.js         ← Status lifecycle model (no dedicated routes yet)
+    admin/
+      adminController.js          ← Dashboard stats, user list, deal list
+      adminRoutes.js              ← All protected by protect + admin middleware
+    otp/
+      otpModel.js                 ← TTL-indexed OTP document
+  middleware/
+    authMiddleware.js             ← protect (Bearer + cookie), admin role check
+    errorMiddleware.js            ← Global error handler
+  config/
+    db.js                         ← MongoDB Atlas connection
+  utils/
+    generateTokens.js             ← JWT creation, cookie setting, SecureStore response
 ```
-
-Shared concerns live outside modules:
-
-- `middleware/` -- authentication guard (`protect`) and error handling
-- `config/` -- database connection
-- `utils/` -- JWT token generation

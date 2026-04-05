@@ -3,71 +3,166 @@
 **Source files:**
 - `src/navigation/RootNavigator.tsx`
 - `src/navigation/AuthNavigator.tsx`
-- `src/navigation/DrawerNavigator.tsx`
-- `src/components/Sidebar.tsx`
+- `src/navigation/DrawerNavigator.tsx` — responsive user navigator
+- `src/navigation/DesktopDrawerNavigator.tsx` — web-only permanent drawer (lazy-loaded)
+- `src/navigation/AdminNavigator.tsx` — responsive admin navigator
+- `src/navigation/DesktopAdminDrawer.tsx` — web-only admin permanent drawer (lazy-loaded)
+- `src/components/Sidebar.tsx` — user sidebar component
+- `src/components/AdminSidebar.tsx` — admin sidebar component
 
-## Overview
+---
 
-Navigation is powered by React Navigation v7. The root navigator acts as an authentication gate, rendering one of two sub-navigators based on the Zustand auth store.
+## Root Navigator
 
+`RootNavigator` wraps everything in a `NavigationContainer` and conditionally renders one of three navigator trees based on auth state and user role:
+
+```tsx
+// RootNavigator.tsx
+const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+const user = useAuthStore(state => state.user);
+
+if (!isAuthenticated)       → <AuthNavigator />
+if (user?.role === 'admin') → <AdminNavigator />
+else                        → <ResponsiveNavigator />
 ```
-RootNavigator (NavigationContainer)
-  |
-  +-- isAuthenticated === false --> AuthNavigator (NativeStackNavigator)
-  |
-  +-- isAuthenticated === true  --> DrawerNavigator (DrawerNavigator)
-```
+
+---
 
 ## Auth Navigator
 
 **Type:** `createNativeStackNavigator`
 
-All screens hide the default header (`headerShown: false`) and use `Colors.background` as the content background.
+All screens use `headerShown: false`.
 
-| Route Name | Screen Component | Purpose |
+| Route | Screen | Purpose |
 |---|---|---|
-| `Login` | `LoginScreen` | Email/phone + password login |
+| `Login` | `LoginScreen` | Email/phone + password login, OTP tab |
 | `Signup` | `SignupScreen` | New user registration |
-| `OTPVerification` | `OTPVerificationScreen` | OTP code entry and verification |
+| `OTPVerification` | `OTPVerificationScreen` | 6-digit OTP entry |
 | `ForgotPassword` | `ForgotPasswordScreen` | Request password reset |
 | `ResetPassword` | `ResetPasswordScreen` | Set new password |
 
-## Drawer Navigator
+---
 
-**Type:** `createDrawerNavigator`
+## User Navigator (Responsive)
 
-The drawer is configured as `permanent` (always visible, not swipeable). The custom sidebar component (`Sidebar`) renders as the drawer content.
+`ResponsiveNavigator` in `DrawerNavigator.tsx` renders differently based on platform and screen width:
 
-**Drawer style:** Width toggles between 80px (collapsed) and 250px (expanded) based on `useUIStore.isSidebarCollapsed`. Background is `Colors.surface` with a right border.
+```
+Platform.OS !== 'web'  OR  width < 768
+  → MobileNavigator (Stack + BottomTabNavigator)
 
-**Initial route:** `Home`
+Platform.OS === 'web'  AND  width >= 768
+  → <Suspense><DesktopDrawerNavigator /></Suspense>  ← lazy-loaded
+```
 
-| Route Name | Screen Component | Visible in Sidebar |
+### Mobile Navigator
+
+A `NativeStackNavigator` wraps a `BottomTabNavigator` and adds detail screens as stack routes:
+
+**Bottom Tabs** (always visible at the bottom on mobile):
+
+| Tab | Screen | Icon |
 |---|---|---|
-| `Home` | `HomeScreen` | Yes (labeled "Discover") |
+| Home | `HomeScreen` | `Home` (Lucide) |
+| Wallet | `WalletScreen` | `Wallet` |
+| Referrals | `ReferScreen` | `Users` |
+| Alerts | `NotificationsScreen` | `Bell` |
+| Settings | `SettingsScreen` | `Settings` |
+
+**Stack routes** (pushed on top of tabs):
+
+| Route | Screen |
+|---|---|
+| `Profile` | `ProfileScreen` |
+| `EditProfile` | `EditProfileScreen` |
+| `MyAddress` | `MyAddressScreen` |
+| `AddEditAddress` | `AddEditAddressScreen` |
+| `TransactionHistory` | `TransactionHistoryScreen` |
+| `ProductDetail` | `ProductDetailScreen` |
+
+### Desktop Drawer Navigator
+
+`DesktopDrawerNavigator.tsx` is **only loaded on web** via `React.lazy()`. It contains `import 'react-native-gesture-handler'` and `createDrawerNavigator` — keeping these imports out of native bundles prevents the TurboModule crash on Expo Go.
+
+**Drawer style:** Permanent (always visible). Width toggles between `250px` (expanded) and `80px` (icon-only collapsed) based on `useUIStore.isSidebarCollapsed`.
+
+| Route | Screen | Visible in Sidebar |
+|---|---|---|
+| `Home` | `HomeScreen` | Yes — "Discover" |
 | `Wallet` | `WalletScreen` | Yes |
 | `Referrals` | `ReferScreen` | Yes |
-| `Notifications` | `HomeScreen` (reused) | Yes |
+| `Notifications` | `NotificationsScreen` | Yes |
 | `Settings` | `SettingsScreen` | Yes |
-| `Profile` | `ProfileScreen` | Yes (profile section at bottom) |
-| `EditProfile` | `EditProfileScreen` | No (navigated from Profile) |
-| `MyAddress` | `MyAddressScreen` | No (navigated from Profile) |
-| `TransactionHistory` | `TransactionHistoryScreen` | No (navigated from Wallet) |
-| `ProductDetail` | `ProductDetailScreen` | No (navigated from Home) |
+| `Profile` | `ProfileScreen` | Via profile card |
+| `EditProfile` | `EditProfileScreen` | No (from Profile) |
+| `MyAddress` | `MyAddressScreen` | No (from Profile) |
+| `AddEditAddress` | `AddEditAddressScreen` | No (from MyAddress) |
+| `TransactionHistory` | `TransactionHistoryScreen` | No (from Wallet) |
+| `ProductDetail` | `ProductDetailScreen` | No (from Home) |
 
-## Sidebar Component
+### User Sidebar Component (`Sidebar.tsx`)
 
-The sidebar is split into three visual sections:
+Three sections:
+1. **Logo area** — ChingiRingi brand + collapse/expand toggle
+2. **Main nav** — Discover, Wallet, Referrals (Lucide icons)
+3. **Bottom nav** — Notifications, Settings, Profile card (shows user initial + wallet balance)
 
-1. **Logo area** -- ChingiRingi brand mark with a collapse/expand toggle button.
-2. **Main navigation** -- Discover (Home), Wallet, Referrals. Uses Lucide icons (`Home`, `Wallet`, `Users`).
-3. **Bottom navigation** -- Notifications (`Bell`), Settings (`Settings`), followed by a profile card showing the user's initial and wallet balance. Tapping the profile card navigates to `Profile`.
+Active route highlighted with `Colors.primaryLight` background + `Colors.primary` text/icon.
 
-Active route highlighting uses `Colors.primaryLight` as the background with `Colors.primary` for text and icon color.
+---
+
+## Admin Navigator (Responsive)
+
+`AdminNavigator.tsx` follows the same responsive pattern as the user navigator:
+
+```
+Platform.OS !== 'web'  OR  width < 768
+  → MobileAdminNavigator (NativeStackNavigator with header)
+
+Platform.OS === 'web'  AND  width >= 768
+  → <Suspense><DesktopAdminDrawer /></Suspense>  ← lazy-loaded
+```
+
+### Mobile Admin Navigator
+
+Stack with header shown (`headerTintColor: Colors.primary`):
+
+| Route | Screen | Header Title |
+|---|---|---|
+| `AdminDashboard` | `AdminDashboardScreen` | Admin Dashboard |
+| `AdminDeals` | `AdminDealsScreen` | Deals |
+| `AdminConversions` | Placeholder | Conversions |
+| `AdminWithdrawals` | Placeholder | Withdrawals |
+| `AdminUsers` | Placeholder | Users |
+| `AdminAllProducts` | Placeholder | Products |
+| `AdminCategories` | Placeholder | Categories |
+| `AdminOrders` | Placeholder | Orders |
+| `AdminInventory` | Placeholder | Inventory |
+| `AdminBanners` | Placeholder | Banners |
+| `AdminCoupons` | Placeholder | Coupons |
+
+### Desktop Admin Drawer
+
+Permanent drawer (250px) with `AdminSidebar` as drawer content. Same routes as mobile admin.
+
+### Admin Sidebar Component (`AdminSidebar.tsx`)
+
+- **Admin profile badge** — "SA" initials badge at the top
+- **Nav items** — Dashboard, Deals, Conversions, Withdrawals, Users
+- **Products submenu** — expandable with ChevronDown/Up; shows All Products, Categories, Orders, Inventory
+- **Banners, Coupons**
+- **Logout button** at the bottom
+
+---
 
 ## Navigation Patterns
 
-- **Auth gate:** Switching between auth and dashboard stacks is driven by Zustand state, not imperative navigation calls.
-- **Back navigation:** `EditProfile`, `MyAddress`, and `TransactionHistory` screens include a manual back button that calls `navigation.goBack()`.
-- **Profile to EditProfile:** `ProfileScreen` navigates to `EditProfile` via `navigation.navigate('EditProfile')`.
-- **Notifications placeholder:** The `Notifications` route currently reuses `HomeScreen` as a placeholder.
+| Pattern | Implementation |
+|---|---|
+| Auth gate | Zustand `isAuthenticated` drives which root navigator renders — no imperative navigation calls |
+| Role-based routing | `user?.role === 'admin'` drives AdminNavigator vs ResponsiveNavigator |
+| Lazy loading | `React.lazy()` + `Suspense` for both desktop drawers — prevents reanimated from loading on native |
+| Back navigation | `navigation.goBack()` in screens that have a back button |
+| Address add/edit | `navigation.navigate('AddEditAddress', { address: raw })` for edit, no params for add |
+| Deal detail | `navigation.navigate('ProductDetail', { deal, dealId })` — passes full deal object to avoid extra API call |

@@ -1,27 +1,68 @@
 # Screens Overview
 
-All dashboard screens live under `src/screens/Dashboard/`. Auth screens live under `src/screens/Auth/`.
+Screens are organized under `src/screens/` by feature area.
 
-## Dashboard Screens
+---
 
-| Screen | File | Description |
+## Auth Screens (`src/screens/Auth/`)
+
+| Screen | File | API Wired | Notes |
+|---|---|---|---|
+| Login | `LoginScreen.tsx` | Yes | Username/password + OTP tab; error UI; redirects to home on success |
+| Signup | `SignupScreen.tsx` | Yes | Full registration form; error UI; sets auth on success |
+| OTP Verification | `OTPVerificationScreen.tsx` | Yes | 6-digit input; 27s resend timer; max 3 attempts |
+| Forgot Password | `ForgotPasswordScreen.tsx` | Yes | Email OTP request; success/error states |
+| Reset Password | `ResetPasswordScreen.tsx` | Yes | OTP + new password form |
+
+---
+
+## Dashboard Screens (`src/screens/Dashboard/`)
+
+| Screen | File | API Wired | Notes |
+|---|---|---|---|
+| Home | `HomeScreen.tsx` | Yes | Deals grid, category pills, trending brands — fetches from API with fallback data |
+| Wallet | `WalletScreen.tsx` | Yes | Balance cards (confirmed, pending, coins, lifetime); recent transactions |
+| Refer & Earn | `ReferScreen.tsx` | Partial | Referral code from user store; share UI; stats (friends joined, amount) are hardcoded |
+| Notifications | `NotificationsScreen.tsx` | No | Empty state placeholder; no backend API yet |
+| Settings | `SettingsScreen.tsx` | Partial | Delete account wired; dark mode toggle is UI-only |
+| Profile | `ProfileScreen.tsx` | Yes | Fetches from `GET /api/profile`; shows referral code, wallet summary, quick actions |
+| Edit Profile | `EditProfileScreen.tsx` | Yes | `GET` + `PUT /api/profile`; name, email, phone fields |
+| My Addresses | `MyAddressScreen.tsx` | Yes | Full address list; delete + set default; edit and add buttons navigate to AddEditAddress |
+| **Add / Edit Address** | `AddEditAddressScreen.tsx` | **Yes** | Full form — type picker (Home/Work/Other), name, phone, address lines, city, state, 6-digit pincode, default toggle; creates or updates via address API |
+| Transaction History | `TransactionHistoryScreen.tsx` | Partial | Filter UI (type + period) exists; list uses hardcoded data — needs wiring to `GET /api/wallet/transactions` |
+| Product Detail | `ProductDetailScreen.tsx` | Yes | Full deal detail — cashback stat card, expiry, lock period, terms, "Shop Now" opens `affiliateUrl` via `Linking.openURL` + click tracking |
+
+---
+
+## Admin Screens (`src/screens/Admin/`)
+
+| Screen | File | API Wired | Notes |
+|---|---|---|---|
+| **Admin Dashboard** | `AdminDashboardScreen.tsx` | **Yes** | 4 stat cards (clicks, conversions, cashback, users); 3 coins economy cards; Revenue Trend placeholder; Top Deals table; Top Users table — from `GET /api/admin/dashboard` |
+| **Admin Deals** | `AdminDealsScreen.tsx` | **Yes** | Deals table (title, brand, cashback, status, expiry, actions); mini stats row (total/active/featured); Add/Edit modal with: title, merchant, category dropdown, cashback type selector (% or flat ₹), expiry date, affiliate link, description, image URL, lock period, tags, terms, featured toggle; toggle active/inactive; delete with confirm |
+| Admin Conversions | `AdminPlaceholderScreen` | No | Placeholder — awaiting Admitad webhook integration |
+| Admin Withdrawals | `AdminPlaceholderScreen` | No | Placeholder — awaiting Razorpay X integration |
+| Admin Users | `AdminPlaceholderScreen` | No | Placeholder — backend endpoint `GET /api/admin/users` exists |
+| Admin All Products | `AdminPlaceholderScreen` | No | Placeholder — awaiting Module 5 (Store) |
+| Admin Categories | `AdminPlaceholderScreen` | No | Placeholder — backend CRUD exists |
+| Admin Orders | `AdminPlaceholderScreen` | No | Placeholder — awaiting Module 5 |
+| Admin Inventory | `AdminPlaceholderScreen` | No | Placeholder — awaiting Module 5 |
+| Admin Banners | `AdminPlaceholderScreen` | No | Placeholder — backend CRUD exists |
+| Admin Coupons | `AdminPlaceholderScreen` | No | Placeholder — Phase 3 |
+
+`createAdminPlaceholder(title)` in `AdminPlaceholderScreen.tsx` is a factory function that returns a simple centered "Coming soon" screen. Replace with a real screen component when building that section.
+
+---
+
+## Screen Data Sources
+
+| Screen | Primary Data Source | Fallback |
 |---|---|---|
-| Home | `HomeScreen.tsx` | Main discovery page with search, categories, hero banner, trending brands, and deal cards |
-| Wallet | `WalletScreen.tsx` | Wallet overview with balance cards (confirmed, pending, coins), lifetime earnings, and transaction list |
-| Refer & Earn | `ReferScreen.tsx` | Referral program page with referral code, share options, stats, how-it-works steps, and recent invites |
-| Profile | `ProfileScreen.tsx` | User profile with contact info, wallet stats summary, referral program card, quick actions, and recent activity |
-| Edit Profile | `EditProfileScreen.tsx` | Form to edit name, email, and phone with avatar upload placeholder |
-| My Addresses | `MyAddressScreen.tsx` | List of saved addresses with edit, delete, and set-as-default actions |
-| Settings | `SettingsScreen.tsx` | Notification toggles, security options, logout, and account deletion with confirmation modals |
-| Transaction History | `TransactionHistoryScreen.tsx` | Filterable transaction list with type and time period filters, summary card, and detailed entries |
-| Product Detail | `ProductDetailScreen.tsx` | Deal detail page with image carousel placeholder, cashback/expiry stats, size selector, terms, and shop CTA |
-
-## Auth Screens
-
-| Screen | File | Description |
-|---|---|---|
-| Login | `LoginScreen.tsx` | Credential-based login form |
-| Signup | `SignupScreen.tsx` | New user registration form |
-| OTP Verification | `OTPVerificationScreen.tsx` | OTP code input and verification |
-| Forgot Password | `ForgotPasswordScreen.tsx` | Email input to request password reset |
-| Reset Password | `ResetPasswordScreen.tsx` | New password entry form |
+| HomeScreen | `GET /api/deals` + `GET /api/categories` | Hardcoded deal/category arrays |
+| WalletScreen | `GET /api/wallet/summary` | Zero balances |
+| ProfileScreen | `GET /api/profile` | — |
+| MyAddressScreen | `GET /api/addresses` | Hardcoded sample addresses |
+| TransactionHistoryScreen | Hardcoded (not yet wired) | — |
+| ProductDetailScreen | Route params `deal` object or `GET /api/deals/:id` | — |
+| AdminDashboardScreen | `GET /api/admin/dashboard` | Zero/empty fallback values |
+| AdminDealsScreen | `GET /api/admin/deals` | Empty state UI |

@@ -18,15 +18,16 @@ All versions listed below are taken directly from the project's `package.json` f
 
 ### Navigation
 
-| Package | Version |
-|---|---|
-| @react-navigation/native | ^7.1.34 |
-| @react-navigation/native-stack | ^7.14.6 |
-| @react-navigation/drawer | ^7.9.5 |
-| react-native-screens | ~4.23.0 |
-| react-native-safe-area-context | ~5.6.2 |
-| react-native-gesture-handler | ~2.30.0 |
-| react-native-reanimated | 4.2.1 |
+| Package | Version | Notes |
+|---|---|---|
+| @react-navigation/native | ^7.1.34 | Core navigation container |
+| @react-navigation/native-stack | ^7.14.6 | Stack navigator (auth + mobile screens) |
+| @react-navigation/bottom-tabs | ^7.x | Bottom tab bar (mobile user navigator) |
+| @react-navigation/drawer | ^7.9.5 | Drawer navigator (desktop web only — lazy-loaded) |
+| react-native-screens | ~4.23.0 | Native screen optimization |
+| react-native-safe-area-context | ~5.6.2 | Safe area insets |
+| react-native-gesture-handler | ~2.30.0 | Required by drawer (web only import) |
+| react-native-reanimated | 4.2.1 | Required by drawer — lazy-loaded to avoid TurboModule crash on native |
 
 ### State Management and Data Fetching
 
@@ -40,15 +41,21 @@ All versions listed below are taken directly from the project's `package.json` f
 
 | Package | Version | Purpose |
 |---|---|---|
-| lucide-react-native | ^1.6.0 | Icon library |
-| react-native-svg | 15.15.3 | SVG rendering |
+| lucide-react-native | ^1.6.0 | Icon library used across all screens |
+| react-native-svg | 15.15.3 | SVG rendering (required by lucide) |
 | expo-status-bar | ~55.0.4 | Status bar control |
 
-### Security
+### Security and Storage
 
 | Package | Version | Purpose |
 |---|---|---|
-| expo-secure-store | ~55.0.9 | Secure key-value storage on native devices |
+| expo-secure-store | ~55.0.9 | Native encrypted key-value storage (iOS Keychain / Android Keystore). Used to persist access and refresh tokens on iOS and Android. Not available on web. |
+
+### Linking and Deep Links
+
+| Package | Version | Purpose |
+|---|---|---|
+| expo-linking | (built into Expo SDK) | `Linking.openURL()` — opens affiliate URLs in the system browser when user taps "Shop Now" on ProductDetailScreen |
 
 ---
 
